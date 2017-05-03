@@ -3,7 +3,6 @@ import json
 import codecs
 
 from testScrapy.items import HSCodeItem
-from testScrapy.spiders.hscode_spider import HSCodeSpider
 
 # Define your item pipelines here
 #
@@ -19,7 +18,7 @@ class TestscrapyPipeline(object):
 class JsonWriterPipeline(object):
     def process_item(self, item, spider):
         if isinstance(item, HSCodeItem):
-            file_name = "%sout/%s.json" % (HSCodeSpider.linux_dir, item['hsCode'])
+            file_name = "./out/%s.json" % item['hsCode']
             # 使用codecs解决中文乱码
             self.file = codecs.open(file_name, 'wb', encoding='utf-8')
 
