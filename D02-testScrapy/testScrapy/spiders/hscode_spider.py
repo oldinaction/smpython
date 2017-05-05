@@ -1,13 +1,19 @@
 # -*- coding: utf-8 -*-
-import scrapy
 # 系统库
 import os
 import socket
-
+import scrapy
+from scrapy import signals
 from scrapy.contrib.loader import ItemLoader
 
 from testScrapy.items import HSCodeItem
 from testScrapy.tools.smexcel import SmExcel
+
+import sys
+
+# 防止运行os.system等命令时中文乱码
+reload(sys)
+sys.setdefaultencoding('utf8')
 
 
 class HSCodeSpider(scrapy.Spider):
@@ -58,7 +64,7 @@ class HSCodeSpider(scrapy.Spider):
                 # 类似于generator（生成器），此时返回一个iterable对象，使用iterable_obj.next()获取下一条数据
                 yield scrapy.Request(url=url, callback=self.parse)
             except StopIteration, e:
-                os.system("echo 'StopIteration index: " + str(i) + "    %s' >> ./out/error.logs" % e)
+                os.system("echo 'StopIteration index: " + str(i) + "    %s' >> ./out/info.logs" % e)
                 print e
 
     '''
@@ -95,7 +101,16 @@ class HSCodeSpider(scrapy.Spider):
             hscode.add_css("lbtehui", "table>tr:nth-of-type(6)>td:nth-child(2)>span")
             hscode.add_css("lbxiaofei", "table>tr:nth-of-type(6)>td:nth-child(4)>span")
             hscode.add_css("lbfuhe", "table>tr:nth-of-type(6)>td:nth-child(6)>span")
-            hscode.add_css("lbshuangfan", "table>tr:nth-of-type(6)>td:nth-child(8)>span")
+			
+            # 双反税率(HS_Search/Hs_Fanqingxiao.aspx?spcode=0207141100)
+			if response.css("table>tr:nth-of-type(6)>td:nth-child(8)>a::text").extract_first() is not None:
+                hscode.add_css("lbshuangfan", "table>tr:nth-of-type(6)>td:nth-child(8)>a")
+                yield scrapy.Request(self.domain + 'HS_Search/Hs_Fanqingxiao.aspx?spcode=' + hscode.load_item()['hsCode'],
+                    meta={'hscode': hscode, 'page_index': 1},
+                    callback=self.parse_shuangfan)
+            else:
+                hscode.add_css("lbshuangfan", "table>tr:nth-of-type(6)>td:nth-child(8)>span")
+				
             hscode.add_css("lbita", "table>tr:nth-of-type(6)>td:nth-child(10)>span")
             # 出口
             hscode.add_css("lbckshuilv", "table>tr:nth-of-type(7)>td:nth-child(3)>span")
@@ -113,8 +128,8 @@ class HSCodeSpider(scrapy.Spider):
             os.system("echo " + hscode.load_item()['hsCode'] + " >> ./out/info.logs")
             yield hscode.load_item()
         except Exception, e:
-            os.system("rm ./out/%s.json" % hscode.load_item()['hsCode'])
-            os.system("echo '%s    parse Exception: %s' >> ./out/error.logs" % (hscode.load_item()['hsCode'], e))
+            os.system("echo '%s    parse Exception: %s' >> ./out/info.logs" % (hscode.load_item()['hsCode'], e))
+			os.system("echo '%s' >> ./out/error.logs" % hscode.load_item()['hsCode'])
 
     '''
     解析协定费率(self.domain + 'HS_Search/Tanchu.aspx?spbm=7616999000&type=xieding')
@@ -127,9 +142,55 @@ class HSCodeSpider(scrapy.Spider):
             for tr in response.css('table>tr'):
                 lbxieding_detail.append({'key': tr.css('td::text').extract_first(),
                                          'value': tr.css('span::text').extract_first()})
-
+			
+			# lbxieding_detail需要在HSCodeItem中声明
             hscode.add_value("lbxieding_detail", lbxieding_detail)
             return hscode.load_item()
         except Exception, e:
-            os.system("rm ./out/%s.json" % hscode.load_item()['hsCode'])
             os.system("echo '%s    parse_xieding Exception: %s' >> ./out/error.logs" % (hscode.load_item()['hsCode'], e))
+			os.system("echo '%s' >> ./out/error.logs" % hscode.load_item()['hsCode'])
+			
+	'''
+    解析双反费率(HS_Search/Hs_Fanqingxiao.aspx?spcode=0207141100). ###使用post提交
+    '''
+    def parse_shuangfan(self, response):
+        hscode = response.meta['hscode']
+        page_index = response.meta['page_index']
+        try:
+            page_size = response.css('table>tr:nth-of-type(8)>td>span:nth-of-type(2)::text').extract_first()
+
+            if not os.path.exists('./out/shuangfan'):
+                os.system("mkdir ./out/shuangfan")
+            if not os.path.exists('./out/shuangfan/' + hscode.load_item()['hsCode']):
+                os.system("mkdir ./out/shuangfan/%s" % hscode.load_item()['hsCode'])
+
+            os.system("echo '%s' >> ./out/shuangfan/%s/%s.html" % (response.body, hscode.load_item()['hsCode'], page_index))
+
+            page_index = page_index + 1
+			# page_size从页面获取的为字符串型, 进行大小比较需要转成int型
+            if page_index <= int(page_size):
+                yield scrapy.FormRequest(
+                    self.domain + 'HS_Search/Hs_Fanqingxiao.aspx?spcode=' + hscode.load_item()['hsCode'],
+                    meta={'hscode': hscode, 'page_index': page_index},
+                    formdata={'__EVENTTARGET': 'gv_FanQingXiaoList$ctl09$btnGo',
+                              '__EVENTARGUMENT': '',
+                              '__VIEWSTATE': response.xpath('//input[@name="__VIEWSTATE"]/@value').extract_first(),
+                              '__VIEWSTATEENCRYPTED': '',
+                              '__EVENTVALIDATION': response.xpath('//input[@name="__EVENTVALIDATION"]/@value').extract_first(),
+                              'gv_FanQingXiaoList$ctl09$txtNewPageIndex': str(page_index)},
+                    callback=self.parse_shuangfan)
+        except Exception, e:
+            os.system("echo '%s    parse_shuangfan Exception: %s' >> ./logs/info.log" % (hscode.load_item()['hsCode'], e))
+            os.system("echo '%s' >> ./logs/error.log" % hscode.load_item()['hsCode'])
+
+	'''
+    爬虫执行完成后执行程序。参考signals信号
+    '''
+	@classmethod
+    def from_crawler(cls, crawler, *args, **kwargs):
+        spider = super(HSCodeSpider, cls).from_crawler(crawler, *args, **kwargs)
+        crawler.signals.connect(spider.spider_closed, signal=signals.spider_closed)
+        return spider
+
+    def spider_closed(self, spider):
+        os.system("tar -czf out.tar.gz ./out/ ")

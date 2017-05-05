@@ -146,18 +146,3 @@ class HSCodeItem(scrapy.Item):
         input_processor=MapCompose(remove_tags),
         output_processor=TakeFirst(),
     )
-
-
-class XieDingItem(scrapy.Item):
-    """协定费率详情"""
-
-    # 地区
-    key = scrapy.Field(
-        input_processor=MapCompose(remove_tags),
-        output_processor=TakeFirst(),
-    )
-    # 费率
-    value = scrapy.Field(
-        input_processor=MapCompose(remove_tags),
-        output_processor=TakeFirst(),
-    )
