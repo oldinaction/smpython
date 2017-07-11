@@ -15,6 +15,8 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+# 继承scrapy.Spider
+
 
 class HSCodeSpider(scrapy.Spider):
     name = "hscode"
@@ -68,7 +70,9 @@ class HSCodeSpider(scrapy.Spider):
                 print e
 
     '''
-    爬虫主入口, 运行命令: scrapy crawl hscode
+    接受爬取后的数据, 运行命令: scrapy crawl hscode
+    1.Scrapy为Spider的 start_urls 属性中的每个URL创建了 scrapy.Request 对象，并将 parse 方法作为回调函数(callback)赋值给了Request。
+    2.Request对象经过调度，执行生成 scrapy.http.Response 对象并送回给spider parse() 方法进行解析
     '''
     def parse(self, response):
         hscode = ItemLoader(item=HSCodeItem(), response=response)
