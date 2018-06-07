@@ -2,7 +2,7 @@
 
 - `python`
 - `pip`(windows默认已经安装，`pip list`查看安装插件)
-- `pip install scrapy`
+- `pip install scrapy` v1.3
 - `pip install xlrd` excel文件操作库
 
 ## 原理
