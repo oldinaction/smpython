@@ -1,5 +1,10 @@
+### 环境
+
 - Python v3.6.4
 - Django v2.0.6
+- [Django快速入门](https://docs.djangoproject.com/zh-hans/2.0/intro/install/)
+
+### 命令
  
 - 视图
     - `django-admin startproject mysite` 进入到某目录初始化项目（会生成mysite项目目录）
@@ -14,3 +19,9 @@
     - `python manage.py shell` 打开python命令行（修改了代码需要重新打开命令行）
 - 管理端
     - `python manage.py createsuperuser` 创建管理员账号
+- 打包
+    - `pip install setuptools` 安装打包工具
+    - `python setup.py sdist` 执行打包
+    - `pip install --user django-polls/dist/django-polls-0.1.tar.gz` 基于用户安装 `django-polls`, 如果基于`virtualenv`安装允许同时运行多个相互独立的Python环境，每个环境都有各自库和应用包命名空间的拷贝
+    - `pip list` 查看包列表
+    - `pip uninstall django-polls` 卸载包
